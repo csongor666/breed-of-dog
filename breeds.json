@@ -1,0 +1,604 @@
+[
+  {
+    "breed": "Puli",
+    "group": "I",
+    "coat": "Nemezes szőr",
+    "care": "Kézzel történő feltépés",
+    "image": "assets/001_puli.jpeg"
+  },
+  {
+    "breed": "Pumi",
+    "group": "I",
+    "coat": "Drótos szőr",
+    "care": "Trimmelés",
+    "image": "assets/002_pumi.jpeg"
+  },
+  {
+    "breed": "Mudi",
+    "group": "I",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/003_mudi.jpeg"
+  },
+  {
+    "breed": "Komondor",
+    "group": "I",
+    "coat": "Nemezes szőr",
+    "care": "Kézzel történő feltépés",
+    "image": "assets/004_komondor.jpeg"
+  },
+  {
+    "breed": "Kuvasz",
+    "group": "I",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/005_kuvasz.jpeg"
+  },
+  {
+    "breed": "Bearded collie",
+    "group": "I",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/006_bearded_collie.jpeg"
+  },
+  {
+    "breed": "Bobtail",
+    "group": "I",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/007_bobtail.jpeg"
+  },
+  {
+    "breed": "Border collie",
+    "group": "I",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/008_border_collie.jpeg"
+  },
+  {
+    "breed": "Német juhászkutya",
+    "group": "I",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/009_nemet_juhaszkutya.jpeg"
+  },
+  {
+    "breed": "Collie / Skót juhászkutya",
+    "group": "I",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/010_collie_skot_juhaszkutya.jpeg"
+  },
+  {
+    "breed": "Dobermann",
+    "group": "II",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/011_dobermann.jpeg"
+  },
+  {
+    "breed": "Schnauzer",
+    "group": "II",
+    "coat": "Szálkás szőr",
+    "care": "Trimmelés",
+    "image": "assets/012_schnauzer.jpeg"
+  },
+  {
+    "breed": "Orosz fekete terrier",
+    "group": "II",
+    "coat": "Nyírós szőr",
+    "care": "Nyírás",
+    "image": "assets/013_orosz_fekete_terrier.jpeg"
+  },
+  {
+    "breed": "Német boxer",
+    "group": "II",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/014_nemet_boxer.jpeg"
+  },
+  {
+    "breed": "Német dog",
+    "group": "II",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/015_nemet_dog.jpeg"
+  },
+  {
+    "breed": "Rottweiler",
+    "group": "II",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/016_rottweiler.jpeg"
+  },
+  {
+    "breed": "Angol bulldog",
+    "group": "II",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/017_angol_bulldog.jpeg"
+  },
+  {
+    "breed": "Bullmastiff",
+    "group": "II",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/018_bullmastiff.jpeg"
+  },
+  {
+    "breed": "Bordeaux-i dog",
+    "group": "II",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/019_bordeaux_i_dog.jpeg"
+  },
+  {
+    "breed": "Sharpei",
+    "group": "II",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/020_sharpei.jpeg"
+  },
+  {
+    "breed": "Leonbergi",
+    "group": "II",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/021_leonbergi.jpeg"
+  },
+  {
+    "breed": "Berni pásztorkutya",
+    "group": "II",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/022_berni_pasztorkutya.jpeg"
+  },
+  {
+    "breed": "Újfundlandi",
+    "group": "II",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/023_ujfundlandi.jpeg"
+  },
+  {
+    "breed": "Airedale terrier",
+    "group": "III",
+    "coat": "Drótos szőr",
+    "care": "Trimmelés",
+    "image": "assets/024_airedale_terrier.jpeg"
+  },
+  {
+    "breed": "Drótszőrű foxterrier",
+    "group": "III",
+    "coat": "Drótos szőr",
+    "care": "Trimmelés",
+    "image": "assets/025_drotszoru_foxterrier.jpeg"
+  },
+  {
+    "breed": "Sima szőrű foxterrier",
+    "group": "III",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/026_sima_szoru_foxterrier.jpeg"
+  },
+  {
+    "breed": "Lakeland terrier",
+    "group": "III",
+    "coat": "Drótos szőr",
+    "care": "Trimmelés",
+    "image": "assets/027_lakeland_terrier.jpeg"
+  },
+  {
+    "breed": "Welsh terrier",
+    "group": "III",
+    "coat": "Drótos szőr",
+    "care": "Trimmelés",
+    "image": "assets/028_welsh_terrier.jpeg"
+  },
+  {
+    "breed": "Ír terrier",
+    "group": "III",
+    "coat": "Szálkás szőr",
+    "care": "Trimmelés",
+    "image": "assets/029_ir_terrier.jpeg"
+  },
+  {
+    "breed": "Cairn terrier",
+    "group": "III",
+    "coat": "Szálkás szőr",
+    "care": "Trimmelés",
+    "image": "assets/030_cairn_terrier.jpeg"
+  },
+  {
+    "breed": "Bedlington terrier",
+    "group": "III",
+    "coat": "Nyírós szőr",
+    "care": "Nyírás",
+    "image": "assets/031_bedlington_terrier.jpeg"
+  },
+  {
+    "breed": "Kerry Blue terrier",
+    "group": "III",
+    "coat": "Nyírós szőr",
+    "care": "Nyírás",
+    "image": "assets/032_kerry_blue_terrier.jpeg"
+  },
+  {
+    "breed": "Dandie Dinmont terrier",
+    "group": "III",
+    "coat": "Szálkás szőr",
+    "care": "Trimmelés",
+    "image": "assets/033_dandie_dinmont_terrier.jpeg"
+  },
+  {
+    "breed": "Norfolk terrier",
+    "group": "III",
+    "coat": "Szálkás szőr",
+    "care": "Trimmelés",
+    "image": "assets/034_norfolk_terrier.jpeg"
+  },
+  {
+    "breed": "Norwich terrier",
+    "group": "III",
+    "coat": "Szálkás szőr",
+    "care": "Trimmelés",
+    "image": "assets/035_norwich_terrier.jpeg"
+  },
+  {
+    "breed": "Sealyham terrier",
+    "group": "III",
+    "coat": "Szálkás szőr",
+    "care": "Trimmelés",
+    "image": "assets/036_sealyham_terrier.jpeg"
+  },
+  {
+    "breed": "Skót terrier",
+    "group": "III",
+    "coat": "Szálkás szőr",
+    "care": "Trimmelés",
+    "image": "assets/037_skot_terrier.jpeg"
+  },
+  {
+    "breed": "West Highland white terrier",
+    "group": "III",
+    "coat": "Szálkás szőr",
+    "care": "Trimmelés",
+    "image": "assets/038_west_highland_white_terrier.jpeg"
+  },
+  {
+    "breed": "Yorkshire terrier",
+    "group": "III",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/039_yorkshire_terrier.jpeg"
+  },
+  {
+    "breed": "Rövid szőrű tacskó",
+    "group": "IV",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/040_rovid_szoru_tacsko.jpeg"
+  },
+  {
+    "breed": "Szálkás szőrű tacskó",
+    "group": "IV",
+    "coat": "Szálkás szőr",
+    "care": "Trimmelés",
+    "image": "assets/041_szalkas_szoru_tacsko.jpeg"
+  },
+  {
+    "breed": "Hosszú szőrű tacskó",
+    "group": "IV",
+    "coat": "Vegyes / zászlós szőr",
+    "care": "Trimmelés",
+    "image": "assets/042_hosszu_szoru_tacsko.jpeg"
+  },
+  {
+    "breed": "Alaszkai malamut",
+    "group": "V",
+    "coat": "Kettős / északi szőr",
+    "care": "Fésülés",
+    "image": "assets/043_alaszkai_malamut.jpeg"
+  },
+  {
+    "breed": "Csau-csau",
+    "group": "V",
+    "coat": "Kettős / északi szőr",
+    "care": "Fésülés",
+    "image": "assets/044_csau_csau.jpeg"
+  },
+  {
+    "breed": "Német Spitz",
+    "group": "V",
+    "coat": "Kettős / északi szőr",
+    "care": "Fésülés",
+    "image": "assets/045_nemet_spitz.jpeg"
+  },
+  {
+    "breed": "Samoyed",
+    "group": "V",
+    "coat": "Kettős / északi szőr",
+    "care": "Fésülés",
+    "image": "assets/046_samoyed.jpeg"
+  },
+  {
+    "breed": "Szibériai husky",
+    "group": "V",
+    "coat": "Kettős / északi szőr",
+    "care": "Fésülés",
+    "image": "assets/047_sziberiai_husky.jpeg"
+  },
+  {
+    "breed": "Erdélyi kopó",
+    "group": "VI",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/048_erdelyi_kopo.jpeg"
+  },
+  {
+    "breed": "Beagle",
+    "group": "VI",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/049_beagle.jpeg"
+  },
+  {
+    "breed": "Basset hound",
+    "group": "VI",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/050_basset_hound.jpeg"
+  },
+  {
+    "breed": "Dalmata",
+    "group": "VI",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/051_dalmata.jpeg"
+  },
+  {
+    "breed": "Rövid szőrű magyar vizsla",
+    "group": "VII",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/052_rovid_szoru_magyar_vizsla.jpeg"
+  },
+  {
+    "breed": "Drótszőrű magyar vizsla",
+    "group": "VII",
+    "coat": "Drótos szőr",
+    "care": "Trimmelés",
+    "image": "assets/053_drotszoru_magyar_vizsla.jpeg"
+  },
+  {
+    "breed": "Pointer",
+    "group": "VII",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/054_pointer.jpeg"
+  },
+  {
+    "breed": "Angol szetter",
+    "group": "VII",
+    "coat": "Vegyes / zászlós szőr",
+    "care": "Trimmelés",
+    "image": "assets/055_angol_szetter.jpeg"
+  },
+  {
+    "breed": "Ír szetter",
+    "group": "VII",
+    "coat": "Vegyes / zászlós szőr",
+    "care": "Trimmelés",
+    "image": "assets/056_ir_szetter.jpeg"
+  },
+  {
+    "breed": "Gordon szetter",
+    "group": "VII",
+    "coat": "Vegyes / zászlós szőr",
+    "care": "Trimmelés",
+    "image": "assets/057_gordon_szetter.jpeg"
+  },
+  {
+    "breed": "Vörös-fehér ír szetter",
+    "group": "VII",
+    "coat": "Vegyes / zászlós szőr",
+    "care": "Trimmelés",
+    "image": "assets/058_voros_feher_ir_szetter.jpeg"
+  },
+  {
+    "breed": "Angol cocker spániel",
+    "group": "VIII",
+    "coat": "Vegyes / zászlós szőr",
+    "care": "Trimmelés",
+    "image": "assets/059_angol_cocker_spaniel.jpeg"
+  },
+  {
+    "breed": "Amerikai cocker spániel",
+    "group": "VIII",
+    "coat": "Vegyes / zászlós szőr",
+    "care": "Trimmelés",
+    "image": "assets/060_amerikai_cocker_spaniel.jpeg"
+  },
+  {
+    "breed": "Angol springer spániel",
+    "group": "VIII",
+    "coat": "Vegyes / zászlós szőr",
+    "care": "Trimmelés",
+    "image": "assets/061_angol_springer_spaniel.jpeg"
+  },
+  {
+    "breed": "Clumber spániel",
+    "group": "VIII",
+    "coat": "Vegyes / zászlós szőr",
+    "care": "Trimmelés",
+    "image": "assets/062_clumber_spaniel.jpeg"
+  },
+  {
+    "breed": "Labrador retriever",
+    "group": "VIII",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/063_labrador_retriever.jpeg"
+  },
+  {
+    "breed": "Golden retriever",
+    "group": "VIII",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/064_golden_retriever.jpeg"
+  },
+  {
+    "breed": "Portugál vízikutya",
+    "group": "VIII",
+    "coat": "Nyírós szőr",
+    "care": "Nyírás",
+    "image": "assets/065_portugal_vizikutya.jpeg"
+  },
+  {
+    "breed": "Kínai meztelenkutya",
+    "group": "IX",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/066_kinai_meztelenkutya.jpeg"
+  },
+  {
+    "breed": "Rövid szőrű csivava",
+    "group": "IX",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/067_rovid_szoru_csivava.jpeg"
+  },
+  {
+    "breed": "Hosszú szőrű csivava",
+    "group": "IX",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/068_hosszu_szoru_csivava.jpeg"
+  },
+  {
+    "breed": "Bichon frise",
+    "group": "IX",
+    "coat": "Nyírós szőr",
+    "care": "Nyírás",
+    "image": "assets/069_bichon_frise.jpeg"
+  },
+  {
+    "breed": "Uszkár",
+    "group": "IX",
+    "coat": "Nyírós szőr",
+    "care": "Nyírás",
+    "image": "assets/070_uszkar.jpeg"
+  },
+  {
+    "breed": "Bolognese",
+    "group": "IX",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/071_bolognese.jpeg"
+  },
+  {
+    "breed": "Havanese",
+    "group": "IX",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/072_havanese.jpeg"
+  },
+  {
+    "breed": "Máltai selyemszőrű kutya",
+    "group": "IX",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/073_maltai_selyemszoru_kutya.jpeg"
+  },
+  {
+    "breed": "Cavalier King Charles spániel",
+    "group": "IX",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/074_cavalier_king_charles_spaniel.jpeg"
+  },
+  {
+    "breed": "Pekingi palotakutya",
+    "group": "IX",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/075_pekingi_palotakutya.jpeg"
+  },
+  {
+    "breed": "Shi tzu",
+    "group": "IX",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/076_shi_tzu.jpeg"
+  },
+  {
+    "breed": "Tibeti terrier",
+    "group": "IX",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/077_tibeti_terrier.jpeg"
+  },
+  {
+    "breed": "Mopsz",
+    "group": "IX",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/078_mopsz.jpeg"
+  },
+  {
+    "breed": "Boston terrier",
+    "group": "IX",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/079_boston_terrier.jpeg"
+  },
+  {
+    "breed": "Francia bulldog",
+    "group": "IX",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/080_francia_bulldog.jpeg"
+  },
+  {
+    "breed": "Magyar agár",
+    "group": "X",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/081_magyar_agar.jpeg"
+  },
+  {
+    "breed": "Whippet",
+    "group": "X",
+    "coat": "Rövid szőr",
+    "care": "Általános ápolás",
+    "image": "assets/082_whippet.jpeg"
+  },
+  {
+    "breed": "Orosz agár / Borzoi",
+    "group": "X",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/083_orosz_agar_borzoi.jpeg"
+  },
+  {
+    "breed": "Afgán agár",
+    "group": "X",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/084_afgan_agar.jpeg"
+  },
+  {
+    "breed": "Perzsa agár",
+    "group": "X",
+    "coat": "Hosszú / félhosszú szőr",
+    "care": "Fésülés",
+    "image": "assets/085_perzsa_agar.jpeg"
+  },
+  {
+    "breed": "Ír farkaskutya",
+    "group": "X",
+    "coat": "Szálkás szőr",
+    "care": "Trimmelés",
+    "image": "assets/086_ir_farkaskutya.jpeg"
+  }
+]
