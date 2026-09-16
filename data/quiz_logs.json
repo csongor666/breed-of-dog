@@ -1,0 +1,31 @@
+[
+  {
+    "timestamp": "2026-09-16T08:04:50+00:00",
+    "difficulty": "Könnyű",
+    "score": 10,
+    "maximum_score": 16,
+    "percent": 62.5,
+    "wrong_breeds": [
+      {
+        "breed": "Afgán agár",
+        "points": 3,
+        "maximum": 4
+      },
+      {
+        "breed": "Collie / Skót juhászkutya",
+        "points": 3,
+        "maximum": 4
+      },
+      {
+        "breed": "Bordeaux-i dog",
+        "points": 2,
+        "maximum": 4
+      },
+      {
+        "breed": "Csau-csau",
+        "points": 2,
+        "maximum": 4
+      }
+    ]
+  }
+]
