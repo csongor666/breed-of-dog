@@ -1,5 +1,11 @@
+import base64
 import json
 import random
+import time
+import urllib.error
+import urllib.request
+import urllib.parse
+from datetime import datetime, timezone
 import re
 import unicodedata
 from pathlib import Path
@@ -19,6 +25,151 @@ GROUPS = [g for g in GROUP_ORDER if any(d["group"] == g for d in DATA)]
 st.markdown("""<style>
 .block-container{max-width:1120px;padding-top:1.35rem}.hero{padding:1.1rem 1.35rem;border-radius:18px;background:linear-gradient(120deg,#17324d,#2d6a78);color:white;margin-bottom:1rem}.hero h1{margin:0;font-size:2.05rem}.hero p{margin:.35rem 0 0;opacity:.88}.stButton button{border-radius:10px;font-weight:650}.result{padding:.8rem 1rem;border-radius:12px;background:#eef8f2;border-left:5px solid #2e8b57}.wrong{background:#fff3f1;border-left-color:#c94c4c}.smallmuted{color:#65717c;font-size:.9rem}.modebox{padding:.7rem 1rem;border-radius:12px;background:#f4f7fa;margin-bottom:.8rem}.answerline{margin:.1rem 0}</style>""", unsafe_allow_html=True)
 
+
+
+def github_config():
+    """Return GitHub settings from Streamlit secrets, or None when not configured."""
+    try:
+        cfg = st.secrets["github"]
+        return {
+            "token": str(cfg["token"]),
+            "owner": str(cfg["owner"]),
+            "repo": str(cfg["repo"]),
+            "branch": str(cfg.get("branch", "main")),
+            "log_path": str(cfg.get("log_path", "data/quiz_logs.json")),
+        }
+    except (KeyError, FileNotFoundError):
+        return None
+
+
+def github_request(method, url, token, payload=None):
+    data = None if payload is None else json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        url,
+        data=data,
+        method=method,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "streamlit-dog-quiz",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            return response.status, json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        try:
+            details = json.loads(body)
+        except json.JSONDecodeError:
+            details = {"message": body}
+        return exc.code, details
+
+
+def load_github_logs():
+    cfg = github_config()
+    if not cfg:
+        return [], "A GitHub naplózás nincs beállítva."
+    path = urllib.parse.quote(cfg["log_path"], safe="/")
+    url = f"https://api.github.com/repos/{cfg['owner']}/{cfg['repo']}/contents/{path}?ref={urllib.parse.quote(cfg['branch'])}"
+    status, result = github_request("GET", url, cfg["token"])
+    if status == 404:
+        return [], None
+    if status != 200:
+        return [], f"GitHub olvasási hiba ({status}): {result.get('message', 'ismeretlen hiba')}"
+    try:
+        raw = base64.b64decode(result["content"].replace("\n", "")).decode("utf-8")
+        logs = json.loads(raw)
+        return logs if isinstance(logs, list) else [], None
+    except (KeyError, ValueError, json.JSONDecodeError) as exc:
+        return [], f"A GitHub napló nem olvasható: {exc}"
+
+
+def append_github_log(entry, retries=3):
+    """Append one result with optimistic retry if another user updated the file."""
+    cfg = github_config()
+    if not cfg:
+        return False, "A GitHub naplózás nincs beállítva a Streamlit Secrets-ben."
+    path = urllib.parse.quote(cfg["log_path"], safe="/")
+    base_url = f"https://api.github.com/repos/{cfg['owner']}/{cfg['repo']}/contents/{path}"
+    for attempt in range(retries):
+        get_url = f"{base_url}?ref={urllib.parse.quote(cfg['branch'])}&t={time.time_ns()}"
+        status, current = github_request("GET", get_url, cfg["token"])
+        if status == 404:
+            logs, sha = [], None
+        elif status == 200:
+            try:
+                logs = json.loads(base64.b64decode(current["content"].replace("\n", "")).decode("utf-8"))
+                if not isinstance(logs, list):
+                    logs = []
+                sha = current["sha"]
+            except (KeyError, ValueError, json.JSONDecodeError) as exc:
+                return False, f"A meglévő napló hibás: {exc}"
+        else:
+            return False, f"GitHub olvasási hiba ({status}): {current.get('message', 'ismeretlen hiba')}"
+        logs.append(entry)
+        payload = {
+            "message": f"Quiz log: {entry['timestamp']}",
+            "content": base64.b64encode(json.dumps(logs, ensure_ascii=False, indent=2).encode("utf-8")).decode("ascii"),
+            "branch": cfg["branch"],
+        }
+        if sha:
+            payload["sha"] = sha
+        put_status, result = github_request("PUT", base_url, cfg["token"], payload)
+        if put_status in (200, 201):
+            return True, None
+        if put_status in (409, 422) and attempt < retries - 1:
+            time.sleep(0.35 * (attempt + 1))
+            continue
+        return False, f"GitHub írási hiba ({put_status}): {result.get('message', 'ismeretlen hiba')}"
+    return False, "A napló mentése ütközések miatt nem sikerült."
+
+
+def build_log_entry(score, maximum, answers, difficulty):
+    wrong = []
+    for row in answers:
+        if row["Pont"] < 4:
+            wrong.append({"breed": row["Helyes fajta"], "points": int(row["Pont"]), "maximum": 4})
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "difficulty": difficulty,
+        "score": int(score),
+        "maximum_score": int(maximum),
+        "percent": round(100 * score / maximum, 1) if maximum else 0.0,
+        "wrong_breeds": wrong,
+    }
+
+
+def show_statistics():
+    st.divider()
+    st.subheader("📊 Összesített statisztika")
+    logs, error = load_github_logs()
+    if error:
+        st.caption(error)
+        return
+    if not logs:
+        st.info("Még nincs eltárolt kitöltés.")
+        return
+    valid = [x for x in logs if isinstance(x, dict)]
+    percentages = [float(x.get("percent", 0)) for x in valid]
+    failures = {}
+    for entry in valid:
+        for item in entry.get("wrong_breeds", []):
+            breed = item.get("breed") if isinstance(item, dict) else str(item)
+            if breed:
+                failures[breed] = failures.get(breed, 0) + 1
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Összes kitöltés", len(valid))
+    c2.metric("Átlagpontszám", f"{sum(percentages) / len(percentages):.1f}%" if percentages else "0.0%")
+    hardest = sorted(failures.items(), key=lambda x: (-x[1], x[0]))[:5]
+    c3.metric("Hibás fajták száma", len(failures))
+    if hardest:
+        st.markdown("**Legnehezebb fajták, hibák száma alapján:**")
+        st.dataframe(pd.DataFrame(hardest, columns=["Fajta", "Hibás kitöltések"]), hide_index=True, use_container_width=True)
+    raw = json.dumps(valid, ensure_ascii=False, indent=2).encode("utf-8")
+    st.download_button("GitHub-log letöltése", raw, "quiz_logs.json", "application/json", use_container_width=True)
 
 def normalize(value):
     value = unicodedata.normalize("NFKD", str(value)).encode("ascii", "ignore").decode().lower()
@@ -79,11 +230,12 @@ def new_quiz(count, selected_groups, difficulty, indices=None):
     st.session_state.checked = False
     st.session_state.seed = rng.randrange(1_000_000_000)
     st.session_state.difficulty_active = difficulty
+    st.session_state.result_logged = False
 
 
 def init():
     defaults = {"quiz": [], "pos": 0, "score": 0, "answers": [], "checked": False,
-                "seed": 0, "difficulty_active": "Könnyű"}
+                "seed": 0, "difficulty_active": "Könnyű", "result_logged": False}
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
@@ -108,6 +260,7 @@ with st.sidebar:
 
 if not st.session_state.quiz:
     st.info("Válaszd ki a beállításokat, majd kattints az **Új feladatsor** gombra.")
+    show_statistics()
     st.stop()
 
 # Final results and targeted retry.
@@ -115,6 +268,14 @@ if st.session_state.pos >= len(st.session_state.quiz):
     maximum = len(st.session_state.quiz) * 4
     percent = 100 * st.session_state.score / maximum if maximum else 0
     st.success(f"Feladatsor kész! Eredmény: **{st.session_state.score}/{maximum} pont ({percent:.0f}%)**")
+    if not st.session_state.result_logged:
+        log_entry = build_log_entry(st.session_state.score, maximum, st.session_state.answers, st.session_state.difficulty_active)
+        saved, log_error = append_github_log(log_entry)
+        if saved:
+            st.session_state.result_logged = True
+            st.toast("Az eredmény bekerült a GitHub-naplóba.", icon="✅")
+        else:
+            st.warning(f"Az eredmény helyben elkészült, de a GitHub-napló mentése nem sikerült: {log_error}")
     df = pd.DataFrame(st.session_state.answers)
     if not df.empty:
         visible = ["Sorszám", "Helyes fajta", "Fajta", "Szőr", "Ápolás", "Fajtacsoport", "Pont"]
@@ -133,6 +294,7 @@ if st.session_state.pos >= len(st.session_state.quiz):
     if st.button("Teljes új feladatsor", use_container_width=True):
         new_quiz(count, selected_groups, difficulty)
         st.rerun()
+    show_statistics()
     st.stop()
 
 pos = st.session_state.pos
@@ -210,3 +372,6 @@ with right:
             st.session_state.pos += 1
             st.session_state.checked = False
             st.rerun()
+
+
+show_statistics()
