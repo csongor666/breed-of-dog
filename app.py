@@ -1,377 +1,313 @@
-import base64
 import json
 import random
-import time
-import urllib.error
-import urllib.request
-import urllib.parse
-from datetime import datetime, timezone
-import re
-import unicodedata
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="Kutyafajta-felismerő", page_icon="🐕", layout="wide")
+st.set_page_config(
+    page_title="Kutyakozmetikus tanuló app",
+    page_icon="🐕",
+    layout="wide",
+)
+
 BASE = Path(__file__).parent
-DATA = json.loads((BASE / "breeds.json").read_text(encoding="utf-8"))
-GROUP_ORDER = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
-BREEDS = [d["breed"] for d in DATA]
-COATS = sorted({d["coat"] for d in DATA})
-CARES = sorted({d["care"] for d in DATA})
-GROUPS = [g for g in GROUP_ORDER if any(d["group"] == g for d in DATA)]
+BREEDS_FILE = BASE / "breeds.json"
+QUESTIONS_FILE = BASE / "questions_001_500.json"
+STATS_FILE = BASE / "quiz_statistics.json"
 
-st.markdown("""<style>
-.block-container{max-width:1120px;padding-top:1.35rem}.hero{padding:1.1rem 1.35rem;border-radius:18px;background:linear-gradient(120deg,#17324d,#2d6a78);color:white;margin-bottom:1rem}.hero h1{margin:0;font-size:2.05rem}.hero p{margin:.35rem 0 0;opacity:.88}.stButton button{border-radius:10px;font-weight:650}.result{padding:.8rem 1rem;border-radius:12px;background:#eef8f2;border-left:5px solid #2e8b57}.wrong{background:#fff3f1;border-left-color:#c94c4c}.smallmuted{color:#65717c;font-size:.9rem}.modebox{padding:.7rem 1rem;border-radius:12px;background:#f4f7fa;margin-bottom:.8rem}.answerline{margin:.1rem 0}</style>""", unsafe_allow_html=True)
+st.markdown(
+    """
+<style>
+.block-container{max-width:1150px;padding-top:1.2rem}
+.hero{padding:1.1rem 1.35rem;border-radius:18px;background:linear-gradient(120deg,#17324d,#2d6a78);color:white;margin-bottom:1rem}
+.hero h1{margin:0;font-size:2.05rem}.hero p{margin:.35rem 0 0;opacity:.9}
+.stButton button{border-radius:10px;font-weight:650}
+.result{padding:.8rem 1rem;border-radius:12px;background:#eef8f2;border-left:5px solid #2e8b57}
+.wrong{background:#fff3f1;border-left-color:#c94c4c}
+.smallmuted{color:#65717c;font-size:.9rem}
+.metricbox{padding:.65rem .8rem;border-radius:12px;background:#f4f7f9}
+</style>
+""",
+    unsafe_allow_html=True,
+)
 
 
-
-def github_config():
-    """Return GitHub settings from Streamlit secrets, or None when not configured."""
+def read_json(path, default):
     try:
-        cfg = st.secrets["github"]
-        return {
-            "token": str(cfg["token"]),
-            "owner": str(cfg["owner"]),
-            "repo": str(cfg["repo"]),
-            "branch": str(cfg.get("branch", "main")),
-            "log_path": str(cfg.get("log_path", "data/quiz_logs.json")),
-        }
-    except (KeyError, FileNotFoundError):
-        return None
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return default
 
 
-def github_request(method, url, token, payload=None):
-    data = None if payload is None else json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(
-        url,
-        data=data,
-        method=method,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {token}",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "streamlit-dog-quiz",
-            "Content-Type": "application/json",
-        },
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            return response.status, json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        try:
-            details = json.loads(body)
-        except json.JSONDecodeError:
-            details = {"message": body}
-        return exc.code, details
-
-
-def load_github_logs():
-    cfg = github_config()
-    if not cfg:
-        return [], "A GitHub naplózás nincs beállítva."
-    path = urllib.parse.quote(cfg["log_path"], safe="/")
-    url = f"https://api.github.com/repos/{cfg['owner']}/{cfg['repo']}/contents/{path}?ref={urllib.parse.quote(cfg['branch'])}"
-    status, result = github_request("GET", url, cfg["token"])
-    if status == 404:
-        return [], None
-    if status != 200:
-        return [], f"GitHub olvasási hiba ({status}): {result.get('message', 'ismeretlen hiba')}"
-    try:
-        raw = base64.b64decode(result["content"].replace("\n", "")).decode("utf-8")
-        logs = json.loads(raw)
-        return logs if isinstance(logs, list) else [], None
-    except (KeyError, ValueError, json.JSONDecodeError) as exc:
-        return [], f"A GitHub napló nem olvasható: {exc}"
-
-
-def append_github_log(entry, retries=3):
-    """Append one result with optimistic retry if another user updated the file."""
-    cfg = github_config()
-    if not cfg:
-        return False, "A GitHub naplózás nincs beállítva a Streamlit Secrets-ben."
-    path = urllib.parse.quote(cfg["log_path"], safe="/")
-    base_url = f"https://api.github.com/repos/{cfg['owner']}/{cfg['repo']}/contents/{path}"
-    for attempt in range(retries):
-        get_url = f"{base_url}?ref={urllib.parse.quote(cfg['branch'])}&t={time.time_ns()}"
-        status, current = github_request("GET", get_url, cfg["token"])
-        if status == 404:
-            logs, sha = [], None
-        elif status == 200:
-            try:
-                logs = json.loads(base64.b64decode(current["content"].replace("\n", "")).decode("utf-8"))
-                if not isinstance(logs, list):
-                    logs = []
-                sha = current["sha"]
-            except (KeyError, ValueError, json.JSONDecodeError) as exc:
-                return False, f"A meglévő napló hibás: {exc}"
-        else:
-            return False, f"GitHub olvasási hiba ({status}): {current.get('message', 'ismeretlen hiba')}"
-        logs.append(entry)
-        payload = {
-            "message": f"Quiz log: {entry['timestamp']}",
-            "content": base64.b64encode(json.dumps(logs, ensure_ascii=False, indent=2).encode("utf-8")).decode("ascii"),
-            "branch": cfg["branch"],
-        }
-        if sha:
-            payload["sha"] = sha
-        put_status, result = github_request("PUT", base_url, cfg["token"], payload)
-        if put_status in (200, 201):
-            return True, None
-        if put_status in (409, 422) and attempt < retries - 1:
-            time.sleep(0.35 * (attempt + 1))
-            continue
-        return False, f"GitHub írási hiba ({put_status}): {result.get('message', 'ismeretlen hiba')}"
-    return False, "A napló mentése ütközések miatt nem sikerült."
-
-
-def build_log_entry(score, maximum, answers, difficulty):
-    wrong = []
-    for row in answers:
-        if row["Pont"] < 4:
-            wrong.append({"breed": row["Helyes fajta"], "points": int(row["Pont"]), "maximum": 4})
-    return {
-        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "difficulty": difficulty,
-        "score": int(score),
-        "maximum_score": int(maximum),
-        "percent": round(100 * score / maximum, 1) if maximum else 0.0,
-        "wrong_breeds": wrong,
-    }
-
-
-def show_statistics():
-    st.divider()
-    st.subheader("📊 Összesített statisztika")
-    logs, error = load_github_logs()
-    if error:
-        st.caption(error)
-        return
-    if not logs:
-        st.info("Még nincs eltárolt kitöltés.")
-        return
-    valid = [x for x in logs if isinstance(x, dict)]
-    percentages = [float(x.get("percent", 0)) for x in valid]
-    failures = {}
-    for entry in valid:
-        for item in entry.get("wrong_breeds", []):
-            breed = item.get("breed") if isinstance(item, dict) else str(item)
-            if breed:
-                failures[breed] = failures.get(breed, 0) + 1
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Összes kitöltés", len(valid))
-    c2.metric("Átlagpontszám", f"{sum(percentages) / len(percentages):.1f}%" if percentages else "0.0%")
-    hardest = sorted(failures.items(), key=lambda x: (-x[1], x[0]))[:5]
-    c3.metric("Hibás fajták száma", len(failures))
-    if hardest:
-        st.markdown("**Legnehezebb fajták, hibák száma alapján:**")
-        st.dataframe(pd.DataFrame(hardest, columns=["Fajta", "Hibás kitöltések"]), hide_index=True, use_container_width=True)
-    raw = json.dumps(valid, ensure_ascii=False, indent=2).encode("utf-8")
-    st.download_button("GitHub-log letöltése", raw, "quiz_logs.json", "application/json", use_container_width=True)
-
-def normalize(value):
-    value = unicodedata.normalize("NFKD", str(value)).encode("ascii", "ignore").decode().lower()
-    return re.sub(r"[^a-z0-9]+", " ", value).strip()
-
-
-def group_is_correct(answer, correct):
-    aliases = {g: {normalize(g), str(i + 1), f"{i + 1} fajtacsoport", f"{normalize(g)} fajtacsoport"}
-               for i, g in enumerate(GROUP_ORDER)}
-    return normalize(answer) in aliases.get(correct, {normalize(correct)})
-
-
-def text_is_correct(answer, correct):
-    return normalize(answer) == normalize(correct)
-
-
-def random_options(correct, pool, amount, rng):
-    others = [x for x in pool if x != correct]
-    selected = rng.sample(others, min(amount - 1, len(others)))
-    result = selected + [correct]
-    rng.shuffle(result)
-    return result
-
-
-def similar_breed_options(item, amount, rng):
-    # First prefer dogs from the same FCI group and with the same coat or care.
-    tiers = [
-        [d["breed"] for d in DATA if d["breed"] != item["breed"] and d["group"] == item["group"] and (d["coat"] == item["coat"] or d["care"] == item["care"])],
-        [d["breed"] for d in DATA if d["breed"] != item["breed"] and d["group"] == item["group"]],
-        [d["breed"] for d in DATA if d["breed"] != item["breed"] and d["coat"] == item["coat"]],
-        [b for b in BREEDS if b != item["breed"]],
-    ]
-    chosen = []
-    for tier in tiers:
-        candidates = [x for x in tier if x not in chosen]
-        rng.shuffle(candidates)
-        chosen.extend(candidates[: max(0, amount - 1 - len(chosen))])
-        if len(chosen) >= amount - 1:
-            break
-    result = chosen[:amount - 1] + [item["breed"]]
-    rng.shuffle(result)
-    return result
-
-
-def new_quiz(count, selected_groups, difficulty, indices=None):
-    rng = random.Random()
-    if indices is None:
-        available = [i for i, d in enumerate(DATA) if d["group"] in selected_groups]
-        rng.shuffle(available)
-        quiz = available[:min(count, len(available))]
+def load_questions():
+    """Use the merged file when present, otherwise combine question blocks."""
+    if QUESTIONS_FILE.exists():
+        raw = read_json(QUESTIONS_FILE, {})
+        questions = raw.get("questions", raw if isinstance(raw, list) else [])
     else:
-        quiz = list(indices)
-        rng.shuffle(quiz)
-    st.session_state.quiz = quiz
-    st.session_state.pos = 0
-    st.session_state.score = 0
-    st.session_state.answers = []
-    st.session_state.checked = False
-    st.session_state.seed = rng.randrange(1_000_000_000)
-    st.session_state.difficulty_active = difficulty
-    st.session_state.result_logged = False
+        questions = []
+        for path in sorted(BASE.glob("questions_*.json")):
+            if path.name == QUESTIONS_FILE.name:
+                continue
+            raw = read_json(path, {})
+            block = raw.get("questions", raw if isinstance(raw, list) else [])
+            questions.extend(block)
+
+    valid = []
+    seen = set()
+    for q in questions:
+        try:
+            qid = int(q["id"])
+            answers = list(q["answers"])
+            correct = int(q["correct"])
+            if qid in seen or len(answers) < 2 or not 0 <= correct < len(answers):
+                continue
+            seen.add(qid)
+            valid.append({**q, "id": qid, "answers": answers, "correct": correct})
+        except (KeyError, TypeError, ValueError):
+            continue
+    return sorted(valid, key=lambda x: x["id"])
 
 
-def init():
-    defaults = {"quiz": [], "pos": 0, "score": 0, "answers": [], "checked": False,
-                "seed": 0, "difficulty_active": "Könnyű", "result_logged": False}
+BREED_DATA = read_json(BREEDS_FILE, [])
+QUESTION_DATA = load_questions()
+
+
+def init_state():
+    defaults = {
+        "breed_quiz": [], "breed_pos": 0, "breed_score": 0,
+        "breed_answers": [], "breed_checked": False, "breed_seed": 0,
+        "theory_quiz": [], "theory_pos": 0, "theory_score": 0,
+        "theory_answers": [], "theory_checked": False, "theory_seed": 0,
+        "theory_retry_mode": False, "theory_history": [],
+    }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
 
 
-init()
-st.markdown('<div class="hero"><h1>🐕 Kutyafajta-felismerő</h1><p>Fajta, szőrtípus, ápolási mód és fajtacsoport felismerése képről</p></div>', unsafe_allow_html=True)
+init_state()
 
-with st.sidebar:
-    st.header("Gyakorlás beállításai")
-    selected_groups = st.multiselect("Fajtacsoportok", GROUPS, default=GROUPS,
-                                     format_func=lambda x: f"{x}. fajtacsoport")
-    max_count = max(1, sum(d["group"] in selected_groups for d in DATA))
-    count = st.slider("Kérdések száma", 1, max_count, min(10, max_count))
-    difficulty = st.radio("Nehézségi szint", ["Könnyű", "Közepes", "Mester"],
-                          help="Könnyű: véletlen opciók. Közepes: hasonló fajták. Mester: szabad szöveges válaszok.")
-    if st.button("Új feladatsor", type="primary", use_container_width=True, disabled=not selected_groups):
-        new_quiz(count, selected_groups, difficulty)
-    st.caption(f"Adatbázis: {len(DATA)} fajta, {len(GROUPS)} fajtacsoport")
-    st.divider()
-    st.markdown("**Pontozás:** képenként 4 pont: fajta + szőrtípus + ápolás + fajtacsoport.")
 
-if not st.session_state.quiz:
-    st.info("Válaszd ki a beállításokat, majd kattints az **Új feladatsor** gombra.")
-    show_statistics()
-    st.stop()
+def four_options(correct, pool, rng):
+    others = [x for x in pool if x != correct]
+    chosen = rng.sample(others, min(3, len(others)))
+    answers = chosen + [correct]
+    rng.shuffle(answers)
+    return answers
 
-# Final results and targeted retry.
-if st.session_state.pos >= len(st.session_state.quiz):
-    maximum = len(st.session_state.quiz) * 4
-    percent = 100 * st.session_state.score / maximum if maximum else 0
-    st.success(f"Feladatsor kész! Eredmény: **{st.session_state.score}/{maximum} pont ({percent:.0f}%)**")
-    if not st.session_state.result_logged:
-        log_entry = build_log_entry(st.session_state.score, maximum, st.session_state.answers, st.session_state.difficulty_active)
-        saved, log_error = append_github_log(log_entry)
-        if saved:
-            st.session_state.result_logged = True
-            st.toast("Az eredmény bekerült a GitHub-naplóba.", icon="✅")
-        else:
-            st.warning(f"Az eredmény helyben elkészült, de a GitHub-napló mentése nem sikerült: {log_error}")
-    df = pd.DataFrame(st.session_state.answers)
-    if not df.empty:
-        visible = ["Sorszám", "Helyes fajta", "Fajta", "Szőr", "Ápolás", "Fajtacsoport", "Pont"]
-        st.dataframe(df[visible], hide_index=True, use_container_width=True)
-        st.download_button("Eredmények letöltése CSV-ben", df.to_csv(index=False).encode("utf-8-sig"),
-                           "fajtafelismero_eredmeny.csv", "text/csv", use_container_width=True)
-        wrong_indices = df.loc[df["Pont"] < 4, "Adatindex"].astype(int).tolist()
-        if wrong_indices:
-            st.warning(f"{len(wrong_indices)} képnél volt legalább egy hibás válasz.")
-            if st.button("🔁 Csak a hibás kérdéseket kérem újra", type="primary", use_container_width=True):
-                new_quiz(len(wrong_indices), selected_groups, st.session_state.difficulty_active, wrong_indices)
-                st.rerun()
-        else:
-            st.balloons()
-            st.info("Minden válasz helyes volt, nincs újragyakorlandó kérdés.")
-    if st.button("Teljes új feladatsor", use_container_width=True):
-        new_quiz(count, selected_groups, difficulty)
-        st.rerun()
-    show_statistics()
-    st.stop()
 
-pos = st.session_state.pos
-item_index = st.session_state.quiz[pos]
-item = DATA[item_index]
-mode = st.session_state.difficulty_active
-rng = random.Random(st.session_state.seed + pos * 7919)
+def start_breed_quiz(count, groups):
+    available = [i for i, d in enumerate(BREED_DATA) if d.get("group") in groups]
+    rng = random.Random()
+    rng.shuffle(available)
+    st.session_state.breed_quiz = available[:min(count, len(available))]
+    st.session_state.breed_pos = 0
+    st.session_state.breed_score = 0
+    st.session_state.breed_answers = []
+    st.session_state.breed_checked = False
+    st.session_state.breed_seed = rng.randrange(1_000_000_000)
 
-st.progress(pos / len(st.session_state.quiz), text=f"{pos + 1}. kérdés / {len(st.session_state.quiz)} | Pont: {st.session_state.score} | {mode}")
-st.markdown(f'<div class="modebox"><b>{mode} szint</b> | Egy képen 4 pont szerezhető.</div>', unsafe_allow_html=True)
-left, right = st.columns([1.05, 1], gap="large")
 
-with left:
-    st.image(str(BASE / item["image"]), use_container_width=True)
-    st.markdown('<p class="smallmuted">A kép a mellékelt fajtafelismerési PDF-ből származik.</p>', unsafe_allow_html=True)
+def start_theory_quiz(count, difficulties, tickets, topics, source_ids=None, retry=False):
+    pool = [q for q in QUESTION_DATA if q.get("difficulty", 1) in difficulties]
+    if tickets:
+        pool = [q for q in pool if q.get("tetel", "") in tickets]
+    if topics:
+        pool = [q for q in pool if q.get("tema", "") in topics]
+    if source_ids is not None:
+        wanted = set(source_ids)
+        pool = [q for q in pool if q["id"] in wanted]
+    rng = random.Random()
+    rng.shuffle(pool)
+    st.session_state.theory_quiz = [q["id"] for q in pool[:min(count, len(pool))]]
+    st.session_state.theory_pos = 0
+    st.session_state.theory_score = 0
+    st.session_state.theory_answers = []
+    st.session_state.theory_checked = False
+    st.session_state.theory_seed = rng.randrange(1_000_000_000)
+    st.session_state.theory_retry_mode = retry
 
-with right:
-    disabled = st.session_state.checked
-    if mode == "Mester":
-        breed = st.text_input("1. Milyen fajta látható a képen?", key=f"breed_{pos}", disabled=disabled,
-                              placeholder="Írd be a fajta nevét")
-        coat = st.text_input("2. Milyen szőrtípusa van?", key=f"coat_{pos}", disabled=disabled,
-                             placeholder="Írd be a szőrtípust")
-        care = st.text_input("3. Milyen ápolást igényel?", key=f"care_{pos}", disabled=disabled,
-                             placeholder="Írd be az ápolási módot")
-        group = st.text_input("4. Melyik fajtacsoportba tartozik?", key=f"group_{pos}", disabled=disabled,
-                              placeholder="Például: III vagy 3")
+
+def save_theory_run():
+    if not st.session_state.theory_answers:
+        return
+    total = len(st.session_state.theory_answers)
+    correct = sum(r["Helyes"] for r in st.session_state.theory_answers)
+    record = {
+        "Időpont": datetime.now().isoformat(timespec="seconds"),
+        "Mód": "Hibás kérdések ismétlése" if st.session_state.theory_retry_mode else "Normál teszt",
+        "Kérdések": total,
+        "Helyes": correct,
+        "Százalék": round(correct * 100 / total, 1) if total else 0,
+    }
+    st.session_state.theory_history.append(record)
+    try:
+        old = read_json(STATS_FILE, [])
+        if not isinstance(old, list):
+            old = []
+        old.append(record)
+        STATS_FILE.write_text(json.dumps(old, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
+
+st.markdown(
+    '<div class="hero"><h1>🐕 Kutyakozmetikus tanuló app</h1>'
+    '<p>Fajtafelismerés és az 1.A–19.C szóbeli tételek gyakorlása egy helyen</p></div>',
+    unsafe_allow_html=True,
+)
+
+breed_tab, theory_tab = st.tabs(["🖼️ Fajtafelismerő", "📚 Tételfelkészítő teszt"])
+
+with breed_tab:
+    if not BREED_DATA:
+        st.error("A fajtafelismerőhöz hiányzik vagy hibás a breeds.json fájl.")
     else:
-        breed_options = (random_options(item["breed"], BREEDS, 4, rng) if mode == "Könnyű"
-                         else similar_breed_options(item, 4, rng))
-        coat_options = random_options(item["coat"], COATS, 4, rng)
-        care_options = random_options(item["care"], CARES, 4, rng)
-        group_options = random_options(item["group"], GROUPS, 3, rng)
-        breed = st.radio("1. Milyen fajta látható a képen?", breed_options, index=None, key=f"breed_{pos}", disabled=disabled)
-        coat = st.radio("2. Milyen szőrtípusa van?", coat_options, index=None, key=f"coat_{pos}", disabled=disabled)
-        care = st.radio("3. Milyen ápolást igényel?", care_options, index=None, key=f"care_{pos}", disabled=disabled)
-        group = st.radio("4. Melyik fajtacsoportba tartozik?", group_options, index=None, key=f"group_{pos}", disabled=disabled,
-                         format_func=lambda x: f"{x}. fajtacsoport")
+        left_cfg, main_area = st.columns([0.28, 0.72], gap="large")
+        with left_cfg:
+            st.subheader("Gyakorlás beállításai")
+            order = ["I","II","III","IV","V","VI","VII","VIII","IX","X"]
+            groups_all = sorted({d["group"] for d in BREED_DATA}, key=lambda x: order.index(x) if x in order else 99)
+            groups = st.multiselect("Fajtacsoportok", groups_all, default=groups_all, format_func=lambda x:f"{x}. fajtacsoport", key="breed_groups")
+            maximum = max(1, sum(d.get("group") in groups for d in BREED_DATA))
+            count = st.slider("Kérdések száma", 1, maximum, min(10, maximum), key="breed_count")
+            if st.button("Új fajtafelismerő feladatsor", type="primary", use_container_width=True, disabled=not groups):
+                start_breed_quiz(count, groups); st.rerun()
+            st.caption(f"Adatbázis: {len(BREED_DATA)} fajta")
 
-    if not st.session_state.checked:
-        if st.button("Válaszok ellenőrzése", type="primary", use_container_width=True):
-            if mode == "Mester":
-                missing = not all(str(x).strip() for x in (breed, coat, care, group))
+        with main_area:
+            if not st.session_state.breed_quiz:
+                st.info("Válaszd ki a fajtacsoportokat, majd indíts új feladatsort.")
+            elif st.session_state.breed_pos >= len(st.session_state.breed_quiz):
+                maximum_score = len(st.session_state.breed_quiz) * 3
+                pct = 100 * st.session_state.breed_score / maximum_score if maximum_score else 0
+                st.success(f"Feladatsor kész: **{st.session_state.breed_score}/{maximum_score} pont ({pct:.0f}%)**")
+                df = pd.DataFrame(st.session_state.breed_answers)
+                if not df.empty:
+                    st.dataframe(df, hide_index=True, use_container_width=True)
+                    st.download_button("Eredmény CSV letöltése", df.to_csv(index=False).encode("utf-8-sig"), "fajtafelismero_eredmeny.csv", "text/csv", use_container_width=True)
             else:
-                missing = None in (breed, coat, care, group)
-            if missing:
-                st.warning("Mind a négy kérdésre válaszolj!")
-            else:
-                checks = {
-                    "Fajta": text_is_correct(breed, item["breed"]),
-                    "Szőr": text_is_correct(coat, item["coat"]),
-                    "Ápolás": text_is_correct(care, item["care"]),
-                    "Fajtacsoport": group_is_correct(group, item["group"]),
-                }
-                points = sum(checks.values())
-                st.session_state.score += points
-                st.session_state.answers.append({
-                    "Sorszám": pos + 1, "Adatindex": item_index, "Helyes fajta": item["breed"],
-                    **{name: "✓" if ok else "✗" for name, ok in checks.items()}, "Pont": points,
-                })
-                st.session_state.checked = True
-                st.rerun()
+                pos = st.session_state.breed_pos
+                item = BREED_DATA[st.session_state.breed_quiz[pos]]
+                rng = random.Random(st.session_state.breed_seed + pos * 7919)
+                breeds = [d["breed"] for d in BREED_DATA]
+                coats = sorted({d["coat"] for d in BREED_DATA})
+                cares = sorted({d["care"] for d in BREED_DATA})
+                st.progress(pos / len(st.session_state.breed_quiz), text=f"{pos+1}. kérdés / {len(st.session_state.breed_quiz)} | Pont: {st.session_state.breed_score}")
+                image_col, answer_col = st.columns([1.06, 1], gap="large")
+                with image_col:
+                    image_path = BASE / item["image"]
+                    if image_path.exists():
+                        st.image(str(image_path), use_container_width=True)
+                    else:
+                        st.warning(f"A kép nem található: {item['image']}")
+                with answer_col:
+                    disabled = st.session_state.breed_checked
+                    breed = st.radio("1. Milyen fajta?", four_options(item["breed"], breeds, rng), index=None, key=f"breed_{pos}", disabled=disabled)
+                    coat = st.radio("2. Milyen szőrtípus?", four_options(item["coat"], coats, rng), index=None, key=f"coat_{pos}", disabled=disabled)
+                    care = st.radio("3. Milyen ápolást igényel?", four_options(item["care"], cares, rng), index=None, key=f"care_{pos}", disabled=disabled)
+                    if not disabled:
+                        if st.button("Válaszok ellenőrzése", type="primary", use_container_width=True, key="breed_check"):
+                            if None in (breed, coat, care):
+                                st.warning("Mindhárom kérdésre válaszolj!")
+                            else:
+                                points = sum([breed == item["breed"], coat == item["coat"], care == item["care"]])
+                                st.session_state.breed_score += points
+                                st.session_state.breed_answers.append({"Sorszám":pos+1,"Helyes fajta":item["breed"],"Fajta":"✓" if breed==item["breed"] else "✗","Szőr":"✓" if coat==item["coat"] else "✗","Ápolás":"✓" if care==item["care"] else "✗","Pont":points})
+                                st.session_state.breed_checked = True; st.rerun()
+                    else:
+                        row = st.session_state.breed_answers[-1]
+                        css = "result" if row["Pont"] == 3 else "result wrong"
+                        st.markdown(f'<div class="{css}"><b>{row["Pont"]}/3 pont</b><br>Helyes megoldás: <b>{item["breed"]}</b><br>{item["coat"]} • {item["care"]}</div>', unsafe_allow_html=True)
+                        if st.button("Következő kérdés →", type="primary", use_container_width=True, key="breed_next"):
+                            st.session_state.breed_pos += 1; st.session_state.breed_checked = False; st.rerun()
+
+with theory_tab:
+    if not QUESTION_DATA:
+        st.error("Nem található kérdésadatbázis. Tedd az app.py mellé a questions_001_500.json fájlt vagy a questions_*.json blokkokat.")
     else:
-        last = st.session_state.answers[-1]
-        css = "result" if last["Pont"] == 4 else "result wrong"
-        st.markdown(
-            f'<div class="{css}"><b>{last["Pont"]}/4 pont</b>'
-            f'<div class="answerline">Fajta: {last["Fajta"]} <b>{item["breed"]}</b></div>'
-            f'<div class="answerline">Szőrtípus: {last["Szőr"]} <b>{item["coat"]}</b></div>'
-            f'<div class="answerline">Ápolás: {last["Ápolás"]} <b>{item["care"]}</b></div>'
-            f'<div class="answerline">Fajtacsoport: {last["Fajtacsoport"]} <b>{item["group"]}.</b></div></div>',
-            unsafe_allow_html=True,
-        )
-        if st.button("Következő kérdés →", type="primary", use_container_width=True):
-            st.session_state.pos += 1
-            st.session_state.checked = False
-            st.rerun()
+        q_by_id = {q["id"]: q for q in QUESTION_DATA}
+        cfg, content = st.columns([0.3, 0.7], gap="large")
+        with cfg:
+            st.subheader("Tételteszt beállításai")
+            diff_labels = {1:"1 – könnyű", 2:"2 – közepes", 3:"3 – nehéz"}
+            difficulties = st.multiselect("Nehézség", [1,2,3], default=[1,2,3], format_func=lambda x:diff_labels[x])
+            tickets_all = sorted({q.get("tetel", "") for q in QUESTION_DATA if q.get("tetel") and q.get("tetel") != "Összefoglaló"}, key=lambda x:(int(x.split('.')[0]) if x.split('.')[0].isdigit() else 99, x))
+            tickets = st.multiselect("Tételek, opcionális", tickets_all)
+            topics_all = sorted({q.get("tema", "") for q in QUESTION_DATA if q.get("tema")})
+            topics = st.multiselect("Témakörök, opcionális", topics_all)
+            eligible = [q for q in QUESTION_DATA if q.get("difficulty",1) in difficulties and (not tickets or q.get("tetel") in tickets) and (not topics or q.get("tema") in topics)]
+            max_count = max(1, len(eligible))
+            test_count = st.slider("Kérdések száma", 1, max_count, min(20,max_count), key="theory_count")
+            if st.button("Új tételteszt", type="primary", use_container_width=True, disabled=not eligible):
+                start_theory_quiz(test_count, difficulties, tickets, topics); st.rerun()
+            st.caption(f"Betöltött kérdések: {len(QUESTION_DATA)} | A beállításnak megfelelő: {len(eligible)}")
 
+            st.divider()
+            st.subheader("Statisztika")
+            history = read_json(STATS_FILE, [])
+            combined_history = history if history else st.session_state.theory_history
+            if combined_history:
+                hdf = pd.DataFrame(combined_history)
+                st.metric("Kitöltött tesztek", len(hdf))
+                st.metric("Átlagos eredmény", f"{hdf['Százalék'].mean():.1f}%")
+                st.download_button("Statisztika letöltése", hdf.to_csv(index=False).encode("utf-8-sig"), "tetelteszt_statisztika.csv", "text/csv", use_container_width=True)
+            else:
+                st.caption("Még nincs mentett teszteredmény.")
 
-show_statistics()
+        with content:
+            if not st.session_state.theory_quiz:
+                st.info("Állítsd be a nehézséget és a kérdésszámot, majd indíts új tételtesztet.")
+            elif st.session_state.theory_pos >= len(st.session_state.theory_quiz):
+                total = len(st.session_state.theory_answers)
+                correct_n = st.session_state.theory_score
+                pct = 100 * correct_n / total if total else 0
+                if not st.session_state.get("theory_run_saved", False):
+                    save_theory_run(); st.session_state.theory_run_saved = True
+                st.success(f"Teszt kész: **{correct_n}/{total} helyes válasz ({pct:.0f}%)**")
+                df = pd.DataFrame(st.session_state.theory_answers)
+                wrong = df[~df["Helyes"]] if not df.empty else pd.DataFrame()
+                c1,c2,c3 = st.columns(3)
+                c1.metric("Helyes", correct_n)
+                c2.metric("Hibás", total-correct_n)
+                c3.metric("Eredmény", f"{pct:.0f}%")
+                if not wrong.empty:
+                    st.subheader("Hibás kérdések")
+                    st.dataframe(wrong[["ID","Tétel","Kérdés","Saját válasz","Helyes válasz","Magyarázat"]], hide_index=True, use_container_width=True)
+                    if st.button("Csak a hibás kérdések újra", type="primary", use_container_width=True):
+                        ids = wrong["ID"].astype(int).tolist()
+                        start_theory_quiz(len(ids), [1,2,3], [], [], source_ids=ids, retry=True)
+                        st.session_state.theory_run_saved = False; st.rerun()
+                else:
+                    st.balloons(); st.info("Minden válasz helyes volt, nincs ismétlendő kérdés.")
+                if not df.empty:
+                    st.download_button("Részletes eredmény letöltése", df.to_csv(index=False).encode("utf-8-sig"), "tetelteszt_eredmeny.csv", "text/csv", use_container_width=True)
+                if st.button("Új teszt indítása", use_container_width=True):
+                    st.session_state.theory_quiz=[]; st.session_state.theory_run_saved=False; st.rerun()
+            else:
+                pos = st.session_state.theory_pos
+                item = q_by_id[st.session_state.theory_quiz[pos]]
+                st.progress(pos/len(st.session_state.theory_quiz), text=f"{pos+1}. kérdés / {len(st.session_state.theory_quiz)} | Pont: {st.session_state.theory_score}")
+                st.caption(f"Tétel: {item.get('tetel','–')} | Téma: {item.get('tema','–')} | Nehézség: {item.get('difficulty',1)}/3")
+                st.markdown(f"### {item['question']}")
+                answer = st.radio("Válassz egy választ:", item["answers"], index=None, key=f"theory_{item['id']}_{pos}", disabled=st.session_state.theory_checked)
+                if not st.session_state.theory_checked:
+                    if st.button("Válasz ellenőrzése", type="primary", use_container_width=True, key="theory_check"):
+                        if answer is None:
+                            st.warning("Jelölj meg egy választ!")
+                        else:
+                            selected_idx = item["answers"].index(answer)
+                            is_correct = selected_idx == item["correct"]
+                            st.session_state.theory_score += int(is_correct)
+                            st.session_state.theory_answers.append({"ID":item["id"],"Tétel":item.get("tetel",""),"Téma":item.get("tema",""),"Nehézség":item.get("difficulty",1),"Kérdés":item["question"],"Saját válasz":answer,"Helyes válasz":item.get("correct_answer", item["answers"][item["correct"]]),"Helyes":is_correct,"Magyarázat":item.get("explanation","")})
+                            st.session_state.theory_checked=True; st.rerun()
+                else:
+                    row=st.session_state.theory_answers[-1]
+                    css="result" if row["Helyes"] else "result wrong"
+                    label="Helyes válasz" if row["Helyes"] else "Hibás válasz"
+                    st.markdown(f'<div class="{css}"><b>{label}</b><br>Helyes megoldás: <b>{row["Helyes válasz"]}</b><br><span class="smallmuted">{row["Magyarázat"]}</span></div>',unsafe_allow_html=True)
+                    if st.button("Következő kérdés →", type="primary", use_container_width=True, key="theory_next"):
+                        st.session_state.theory_pos += 1; st.session_state.theory_checked=False; st.rerun()
